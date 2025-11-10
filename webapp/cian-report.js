@@ -100,7 +100,7 @@ const openAreaModal = async (externalId) => {
     const response = await fetch(`/api/objects/${encodeURIComponent(externalId)}`);
     if (!response.ok) throw new Error(await response.text());
     const data = await response.json();
-    const currentArea = data.total_area || data.area || data.square_total || data.square || "";
+    const currentArea = data.living_area || data.area_living || data.square_living || data.total_area || data.area || data.square_total || data.square || "";
     areaLabel.textContent = `Текущая площадь: ${currentArea || "не указана"}`;
     areaInput.value = currentArea || "";
   } catch (error) {
@@ -151,8 +151,7 @@ const renderOffers = (offers = []) => {
             <button data-offer-action="open" data-offer-url="${offer.url || ""}" ${
               offer.url ? "" : "disabled"
             }>Открыть объявление</button>
-            <button data-offer-action="change-area" data-offer-id="${escapeHtml(externalId)}">Изменить площадь</button>
-            <button class="danger" data-offer-action="delete" data-offer-id="${escapeHtml(externalId)}">Удалить</button>
+            <button data-offer-action="change-area" data-offer-id="${escapeHtml(externalId)}">Изменить жилую площадь</button>
           </div>
         </article>
       `;
@@ -178,17 +177,11 @@ const renderImages = (items = []) => {
             <span>${escapeHtml(item.errorType || "")}</span>
           </div>
           <p>${escapeHtml(item.errorText || "Описание отсутствует")}</p>
-          ${
-            item.url
-              ? `<a href="${item.url}" target="_blank" rel="noopener noreferrer">Открыть изображение</a>`
-              : ""
-          }
           <div class="report-actions">
             <button data-image-action="open" data-image-url="${item.url || ""}" ${
               item.url ? "" : "disabled"
             }>Открыть изображение</button>
-            <button data-image-action="add-photo" data-image-offer="${escapeHtml(item.offerId || "")}">Добавить фото</button>
-            <button class="danger" data-image-action="delete" data-image-offer="${escapeHtml(item.offerId || "")}">Удалить</button>
+            <button class="danger" data-image-action="delete-photo" data-image-offer="${escapeHtml(item.offerId || "")}">Удалить фото</button>
           </div>
         </article>
       `
@@ -269,7 +262,7 @@ areaForm?.addEventListener("submit", async (event) => {
   }
   try {
     areaStatus.textContent = "Сохраняем...";
-    await patchObject(areaObjectId, { total_area: Number(value) });
+    await patchObject(areaObjectId, { living_area: Number(value) });
     areaStatus.textContent = "Сохранено";
     setTimeout(() => {
       areaStatus.textContent = "";
@@ -300,10 +293,6 @@ offersEl?.addEventListener("click", async (event) => {
       case "change-area":
         openAreaModal(externalId);
         break;
-      case "delete":
-        await deleteByExternalId(externalId);
-        card?.remove();
-        break;
       default:
         break;
     }
@@ -323,7 +312,7 @@ imagesEl?.addEventListener("click", async (event) => {
       case "open":
         if (url) window.open(url, "_blank");
         break;
-      case "add-photo":
+      case "delete-photo":
         openListingsPage(offerId, { openEditor: true });
         card?.classList.add("resolved");
         break;

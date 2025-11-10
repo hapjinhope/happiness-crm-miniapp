@@ -1,3 +1,4 @@
+import asyncio
 import html
 import json
 import logging
@@ -603,7 +604,12 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_callback))
 
     logger.info("Bot is starting...")
-    application.run_polling()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        application.run_polling()
+    finally:
+        loop.close()
 
 
 if __name__ == "__main__":

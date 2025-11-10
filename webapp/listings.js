@@ -555,14 +555,10 @@ if (!container) {
   const openPhotoMenu = (index, anchor) => {
     if (!photoMenu || !anchor) return;
     photoMenuState = { index, anchor };
+    const rect = anchor.getBoundingClientRect();
+    photoMenu.style.top = `${rect.bottom + 6}px`;
+    photoMenu.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - 180))}px`;
     photoMenu.classList.remove("hidden");
-    requestAnimationFrame(() => {
-      const rect = anchor.getBoundingClientRect();
-      const menuRect = photoMenu.getBoundingClientRect();
-      const maxLeft = window.innerWidth - menuRect.width - 12;
-      photoMenu.style.top = `${rect.bottom + 6}px`;
-      photoMenu.style.left = `${Math.max(12, Math.min(rect.left, maxLeft))}px`;
-    });
   };
 
   const closeEditor = () => {
