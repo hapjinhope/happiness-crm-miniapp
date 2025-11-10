@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Мои объявления · HAPPINESS CRM</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="cabinet">
+    <header class="app-header compact">
+      <div class="brand">
+        <span class="brand-badge">HC</span>
+        <div class="brand-text">
+          <div class="brand-title">Мои объявления</div>
+          <div class="brand-subtitle">активные объекты</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-content">
+      <div class="listing-search">
+        <input
+          type="search"
+          id="listingsSearchInput"
+          placeholder="Поиск по адресу, ID или ЖК"
+          autocomplete="off"
+        />
+        <p class="search-caption">Поиск</p>
+      </div>
+      <div class="listing-tabs" id="listingTabs">
+        <button class="listing-tab active" data-filter="published">Опубликовано</button>
+        <button class="listing-tab" data-filter="staging">На стадии публикации</button>
+        <button class="listing-tab" data-filter="rejected">Не прошли проверку</button>
+      </div>
+      <section id="listingsContainer" class="objects-list">
+        <div class="empty-state">Загрузка объявлений...</div>
+      </section>
+    </main>
+
+    <div class="app-version-chip" id="appVersionChip">HAPPINESS CRM · Beta 0.1.0-beta.3</div>
+
+    <div id="detailModal" class="modal hidden">
+      <div class="modal-content">
+        <button id="modalClose" class="modal-close" aria-label="Закрыть">×</button>
+        <div id="detailBody"></div>
+      </div>
+    </div>
+
+    <div id="lightbox" class="lightbox hidden">
+      <button id="lightboxClose" class="lightbox-close" aria-label="Закрыть">×</button>
+      <button class="lightbox-nav prev" aria-label="Предыдущее фото">‹</button>
+      <img id="lightboxImage" alt="Фото объекта" />
+      <button class="lightbox-nav next" aria-label="Следующее фото">›</button>
+    </div>
+
+    <nav class="bottom-nav">
+      <a class="nav-item" data-target="home" href="/stub.html?view=home">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Главная</span>
+        <small>🚧 в разработке</small>
+      </a>
+      <a class="nav-item" data-target="favorites" href="/stub.html?view=favorites">
+        <span class="nav-icon">❤️</span>
+        <span class="nav-label">Избранное</span>
+        <small>🚧 в разработке</small>
+      </a>
+      <a class="nav-item nav-search" data-target="search" href="/search.html">
+        <span class="nav-icon">🔍</span>
+      </a>
+      <a class="nav-item" data-target="messages" href="/stub.html?view=messages">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label">Сообщения</span>
+        <small>🚧 в разработке</small>
+      </a>
+      <a class="nav-item" data-target="cabinet" href="/cabinet.html">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Кабинет</span>
+      </a>
+    </nav>
+
+    <div id="listingSheet" class="action-sheet hidden">
+      <div class="sheet-content">
+        <div class="sheet-header">
+          <strong>Действия с объявлением</strong>
+          <button id="sheetClose" aria-label="Закрыть">×</button>
+        </div>
+        <div class="sheet-actions">
+          <button data-action="edit">Редактировать объявление</button>
+          <button data-action="collection">Добавить в подборку</button>
+          <button data-action="stats" disabled>Статистика (в разработке)</button>
+          <button data-action="share" disabled>Поделиться (в разработке)</button>
+          <button data-action="archive" disabled>Перенести в архив (в разработке)</button>
+          <button data-action="delete">Удалить объявление</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="editorModal" class="modal hidden">
+      <div class="modal-content editor-modal">
+        <button id="editorClose" class="modal-close" aria-label="Закрыть">×</button>
+        <h2 id="editorTitle">Редактирование</h2>
+        <form id="editorForm" class="editor-form"></form>
+        <div class="editor-actions">
+          <span class="editor-status" id="editorStatus"></span>
+          <div class="editor-buttons">
+            <button type="button" id="editorCancel" class="ghost">Отмена</button>
+            <button type="submit" form="editorForm" class="primary">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="photoMenu" class="photo-menu hidden">
+      <button type="button" data-photo-action="main">Сделать главной</button>
+      <button type="button" data-photo-action="delete" class="danger">Удалить</button>
+      <button type="button" data-photo-action="close">Отмена</button>
+    </div>
+    <input type="file" id="photoFileInput" accept="image/*" class="hidden-file-input" />
+
+    <script type="module" src="/static/app.js"></script>
+    <script type="module" src="/static/listings.js"></script>
+    <script type="module" src="/static/nav.js"></script>
+  </body>
+</html>
