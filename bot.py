@@ -604,6 +604,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_callback))
 
     logger.info("Bot is starting...")
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
