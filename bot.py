@@ -599,18 +599,10 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("menu", start))
     application.add_handler(CommandHandler("app", open_webapp))
-    application.add_handler(CommandHandler(list(REQUEST_COMMANDS), request_id_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_object_request))
-    application.add_handler(CallbackQueryHandler(handle_callback))
 
     logger.info("Bot is starting...")
     asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        application.run_polling()
-    finally:
-        loop.close()
+    asyncio.run(application.run_polling())
 
 
 if __name__ == "__main__":

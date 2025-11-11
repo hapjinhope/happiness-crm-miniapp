@@ -50,7 +50,7 @@
 | `WEBAPP_AUTOSTART` | `true/false`. Если `true`, при запуске бота автоматически поднимается локальный `uvicorn miniapp_server`. |
 | `WEBAPP_HOST` / `WEBAPP_PORT` | Адрес и порт для локального `uvicorn`, когда включён `WEBAPP_AUTOSTART`. |
 
-## Мини‑приложение (WebApp)
+## Мини-приложение (WebApp)
 
 1. **Собрать фронтенд/бекенд**
    - Автозапуск вместе с ботом: выставьте `WEBAPP_AUTOSTART=true` и запустите `python bot.py` — будет поднят встроенный `uvicorn` на `WEBAPP_HOST:WEBAPP_PORT`.
@@ -63,7 +63,23 @@
    - Оранжевый шапка «HAPPINESS CRM», список объектов по умолчанию.
    - Поиск по ID/адресу в реальном времени.
    - В каждой карточке: ID, адрес, цена, базовые характеристики. Кнопка «Добавить объект» зарезервирована (в разработке).
-   - Приложение готово к подключению как Telegram Web App, но может работать и как обычная SPA в браузере.
+- Приложение готово к подключению как Telegram Web App, но может работать и как обычная SPA в браузере.
+
+## Деплой на Railway
+
+Railway использует buildpacks по аналогии с Heroku, поэтому достаточно добавить Procfile и указать версию Python. Всё уже подготовлено:
+
+- `Procfile` — содержит `web: python bot.py`, поэтому Railway поднимает бота (вместе с встроенным mini-app сервером, если `WEBAPP_AUTOSTART=true`).
+- `runtime.txt` — фиксирует версию Python (`python-3.11.7`).
+
+### Шаги
+
+1. Создайте новый проект в Railway и подключите репозиторий.
+2. В разделе Variables задайте все переменные окружения из `.env` (см. таблицу выше). Минимально нужны `TELEGRAM_BOT_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_OBJECT_ID_COLUMN`, `CIAN_API_TOKEN` и `TELEGRAM_WEBAPP_URL`.
+3. Деплой произойдёт автоматически, Railway выполнит `pip install -r requirements.txt`, затем команду из Procfile.
+4. После запуска в логах должны появиться строки `Application started` и `Uvicorn running...` — это значит, что бот и mini-app сервер готовы.
+
+> Важно: Telegram допускает только один работающий экземпляр бота на один токен. Если запускаете Railway-сервис, убедитесь, что локальные/другие инстансы остановлены, иначе polling получит `409 Conflict`.
 
 ## Проверка
 
