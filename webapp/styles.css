@@ -50,6 +50,7 @@ body.modal-lock {
     linear-gradient(135deg, rgba(24, 9, 52, 0.98), rgba(15, 5, 30, 0.98));
   color: var(--text);
   padding: 1.1rem 1.35rem;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1.1rem);
   box-shadow: 0 25px 60px rgba(4, 0, 12, 0.7);
   border-bottom-left-radius: 32px;
   border-bottom-right-radius: 32px;
