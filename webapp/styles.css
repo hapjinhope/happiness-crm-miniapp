@@ -99,16 +99,11 @@ body.modal-lock {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  order: 2;
 }
 
 .app-header .header-title {
-  flex: 1;
+  flex: 0 1 auto;
   text-align: center;
-}
-
-.app-header > *:first-child {
-  margin-right: auto;
 }
 
 .app-header {
