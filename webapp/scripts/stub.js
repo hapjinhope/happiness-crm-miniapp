@@ -1,17 +1,15 @@
 const params = new URLSearchParams(window.location.search);
-const view = params.get("view") || "favorites";
+const view = params.get("view") || "publish";
 const titles = {
-  home: "Главная",
-  favorites: "Избранное",
+  publish: "Размещение",
   messages: "Сообщения",
 };
 const messages = {
-  home: "🏠 Главная страница пока в разработке.",
-  favorites: "❤️ Сохраняйте объекты позже — раздел в работе.",
-  messages: "💬 Чаты появятся в одном из следующих релизов.",
+  publish: "🛠️ Размещение объявлений появится в одном из следующих релизов.",
+  messages: "💬 Чаты появятся чуть позже.",
 };
 
-const pageMap = { home: "home", favorites: "favorites", messages: "messages" };
+const pageMap = { publish: "cabinet", messages: "messages" };
 document.body.dataset.page = pageMap[view] || "cabinet";
 const titleEl = document.getElementById("stubTitle");
 const textEl = document.getElementById("stubMessage");

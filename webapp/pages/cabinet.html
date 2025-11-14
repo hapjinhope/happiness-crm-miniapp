@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Кабинет · HAPPINESS CRM</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="cabinet">
+    <header class="app-header">
+      <button class="header-pill" data-nav="primary">Назад</button>
+      <div class="header-title">
+        <strong>Личный кабинет</strong>
+      </div>
+    </header>
+
+    <main class="app-content cabinet">
+      <section class="wallet-menu">
+        <a class="wallet-entry disabled" href="/stub.html?view=publish">
+          <div class="wallet-entry-icon muted">🛠️</div>
+          <div class="wallet-entry-text">
+            <strong>Разместить объявление</strong>
+            <span>скоро появится</span>
+          </div>
+          <span class="wallet-entry-pill">в разработке</span>
+        </a>
+        <a class="wallet-entry prominent" href="/listings.html">
+          <div class="wallet-entry-icon">🏙️</div>
+          <div class="wallet-entry-text">
+            <strong>Мои объявления</strong>
+            <span>перейти в список</span>
+          </div>
+          <span class="wallet-entry-arrow">›</span>
+        </a>
+      </section>
+    </main>
+
+    <script type="module" src="/static/scripts/header.js"></script>
+  </body>
+</html>

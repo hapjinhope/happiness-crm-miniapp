@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Модерация · HAPPINESS CRM</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="moderation">
+    <header class="app-header">
+      <button class="header-pill" data-nav="primary">Назад</button>
+      <div class="header-title">
+        <strong>Модерация</strong>
+        <small>объявления в очереди</small>
+      </div>
+    </header>
+
+    <main class="app-content">
+      <div class="mod-tabs">
+        <button type="button" class="mod-tab active" data-tab-target="queue">Проверка</button>
+        <button type="button" class="mod-tab" data-tab-target="reports">Выгрузка</button>
+      </div>
+
+      <section class="mod-pane active" data-tab-panel="queue">
+        <div class="moderation-list" id="moderationList">
+          <div class="empty-state">Загрузка объявлений...</div>
+        </div>
+      </section>
+
+      <section class="mod-pane" data-tab-panel="reports">
+        <section class="report-summary" id="reportSummary">
+          <strong>Загрузка статуса…</strong>
+          <span id="reportSummaryMeta"></span>
+        </section>
+
+        <section>
+          <div class="report-section-head">
+            <h3>Ошибки объявлений</h3>
+            <div>
+              <button id="reportRefresh" type="button">Обновить</button>
+            </div>
+          </div>
+          <div id="reportOffers" class="report-list">
+            <div class="report-empty">Ошибок не обнаружено</div>
+          </div>
+        </section>
+
+        <section>
+          <div class="report-section-head">
+            <h3>Ошибки изображений</h3>
+          </div>
+          <div id="reportImages" class="report-list">
+            <div class="report-empty">Ошибок не обнаружено</div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="moderationModal" class="modal hidden">
+      <div class="modal-content moderation-modal">
+        <button class="modal-close" data-close-modal="moderationModal" aria-label="Закрыть">×</button>
+        <div class="moderation-modal-body">
+          <div class="moderation-gallery">
+            <div class="hero-slider">
+              <button class="hero-nav prev" id="modGalleryPrev" aria-label="Предыдущее фото">‹</button>
+              <div class="hero-photo" id="modMainPhoto">
+                <img id="modMainPhotoImg" alt="Фото объекта" />
+                <span class="hero-badge" id="modPhotoBadge"></span>
+              </div>
+              <button class="hero-nav next" id="modGalleryNext" aria-label="Следующее фото">›</button>
+            </div>
+            <div class="hero-thumbs" id="modThumbs"></div>
+          </div>
+          <div class="moderation-meta">
+            <div class="moderation-meta-row">
+              <div>
+                <p class="moderation-address" id="modAddress">Адрес</p>
+                <p class="moderation-complex" id="modComplex">ЖК</p>
+              </div>
+              <button id="modOwnerButton" class="owner-link-btn" disabled>Собственник</button>
+            </div>
+            <div class="moderation-fields">
+              <div class="field-block">
+                <label>Тип объявления</label>
+                <div class="segment-control" id="modTypeControl">
+                  <button type="button" data-value="Квартира">Квартира</button>
+                  <button type="button" data-value="Апартаменты">Апартаменты</button>
+                </div>
+              </div>
+              <div class="field-block">
+                <label>Комнатность</label>
+                <div class="segment-control small" id="modRoomsControl">
+                  <button data-value="1">1</button>
+                  <button data-value="2">2</button>
+                  <button data-value="3">3</button>
+                  <button data-value="4">4</button>
+                  <button data-value="5">5</button>
+                  <button data-value="6">6+</button>
+                </div>
+              </div>
+              <div class="field-grid">
+                <label>
+                  Жилая, м²
+                  <input type="number" step="0.1" id="modLivingInput" />
+                </label>
+                <label>
+                  Кухня, м²
+                  <input type="number" step="0.1" id="modKitchenInput" />
+                </label>
+              </div>
+              <div class="field-block">
+                <label>Техника</label>
+                <div class="feature-grid" id="modTechToggles">
+                  <button type="button" data-field="fridge">Холодильник</button>
+                  <button type="button" data-field="washer">Стиралка</button>
+                  <button type="button" data-field="dishwasher">Посудомойка</button>
+                  <button type="button" data-field="conditioner">Кондиционер</button>
+                  <button type="button" data-field="tv">Телевизор</button>
+                </div>
+              </div>
+              <div class="field-block">
+                <label>Ванная</label>
+                <div class="feature-grid" id="modBathToggles">
+                  <button type="button" data-field="bathtub">Ванна</button>
+                  <button type="button" data-field="shower">Душ</button>
+                </div>
+              </div>
+              <div class="field-grid counters">
+                <div>
+                  <label>Санузел совмещенный</label>
+                  <div class="counter-field" data-counter="bath-combined">
+                    <button type="button" data-action="dec">−</button>
+                    <span data-value>0</span>
+                    <button type="button" data-action="inc">+</button>
+                  </div>
+                </div>
+                <div>
+                  <label>Санузел раздельный</label>
+                  <div class="counter-field" data-counter="bath-separate">
+                    <button type="button" data-action="dec">−</button>
+                    <span data-value>0</span>
+                    <button type="button" data-action="inc">+</button>
+                  </div>
+                </div>
+              </div>
+              <div class="field-grid counters">
+                <div>
+                  <label>Балконы</label>
+                  <div class="counter-field" data-counter="balconies">
+                    <button type="button" data-action="dec">−</button>
+                    <span data-value>0</span>
+                    <button type="button" data-action="inc">+</button>
+                  </div>
+                </div>
+                <div>
+                  <label>Лоджии</label>
+                  <div class="counter-field" data-counter="loggias">
+                    <button type="button" data-action="dec">−</button>
+                    <span data-value>0</span>
+                    <button type="button" data-action="inc">+</button>
+                  </div>
+                </div>
+              </div>
+              <div class="field-block">
+                <label>Парковка</label>
+                <div class="segment-control" id="modParkingControl">
+                  <button data-value="подземная">Подземная</button>
+                  <button data-value="наземная">Наземная</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="moderation-actions">
+            <p id="moderationStatus" class="modal-status"></p>
+            <div class="moderation-buttons">
+              <button type="button" id="modApproveBtn" class="ghost">Ошибок нет</button>
+              <button type="button" id="modSaveBtn" class="primary">Редактировать</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="areaModal" class="area-modal hidden">
+      <div class="area-modal__inner">
+        <h3>Изменить площадь</h3>
+        <p id="areaModalLabel">Загружаем данные...</p>
+        <form id="areaForm">
+          <label>
+            Новая площадь, м²
+            <input type="number" step="0.1" id="areaInput" required />
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" id="areaConfirm" />
+            Подтвердить изменение
+          </label>
+          <div class="area-modal__actions">
+            <span id="areaStatus" class="area-status"></span>
+            <div>
+              <button type="button" id="areaCancel" class="ghost">Отмена</button>
+              <button type="submit" class="primary">Сохранить</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="detailModal" class="modal hidden">
+      <div class="modal-content">
+        <button id="modalClose" class="modal-close" aria-label="Закрыть">×</button>
+        <div id="detailBody"></div>
+      </div>
+    </div>
+
+    <div id="lightbox" class="lightbox hidden">
+      <button id="lightboxClose" class="lightbox-close" aria-label="Закрыть">×</button>
+      <button class="lightbox-nav prev" aria-label="Предыдущее фото">‹</button>
+      <img id="lightboxImage" alt="Фото объекта" />
+      <button class="lightbox-nav next" aria-label="Следующее фото">›</button>
+    </div>
+
+    <script type="module" src="/static/scripts/header.js"></script>
+    <script type="module" src="/static/scripts/app.js"></script>
+    <script type="module" src="/static/scripts/moderation.js"></script>
+    <script type="module" src="/static/scripts/cian-report.js"></script>
+  </body>
+</html>

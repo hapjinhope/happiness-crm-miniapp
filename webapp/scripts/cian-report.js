@@ -31,6 +31,11 @@ const formatDate = (iso) => {
   }
 };
 
+const formatPrice = (value) => {
+  if (!value) return "—";
+  return new Intl.NumberFormat("ru-RU").format(Number(value)) + " ₽";
+};
+
 const renderEmpty = (el, message) => {
   el.innerHTML = `<div class="report-empty">${message}</div>`;
 };
@@ -49,15 +54,17 @@ const buildListingsUrl = (externalId, options = {}) => {
 
 const openListingsPage = (externalId, options = {}) => {
   const url = buildListingsUrl(externalId, options);
-  window.open(url, "_blank");
+  window.location.href = url;
 };
 
-const deleteByExternalId = async (externalId) => {
+const deleteByExternalId = async (externalId, mode = "delete") => {
   if (!externalId) return;
-  if (!confirm(`Удалить объявление #${externalId}?`)) return;
-  const response = await fetch(`/api/objects/${encodeURIComponent(externalId)}`, {
-    method: "DELETE",
-  });
+  const response = await fetch(
+    `/api/objects/${encodeURIComponent(externalId)}?mode=${encodeURIComponent(mode)}`,
+    {
+      method: "DELETE",
+    }
+  );
   if (!response.ok) {
     throw new Error(await response.text());
   }
@@ -132,32 +139,34 @@ const renderOffers = (offers = []) => {
   offersEl.innerHTML = problematic
     .map((offer) => {
       const externalId = String(offer.externalId || offer.offerId || "");
-      const errors = formatIssueList(offer.errors || []);
-      const warnings = formatIssueList(offer.warnings || []);
+      const errors = offer.errors || [];
+      const warnings = offer.warnings || [];
+      const message =
+        errors.length || warnings.length
+          ? escapeHtml((errors.length ? errors : warnings).join("; "))
+          : "Описание ошибки отсутствует";
       return `
-        <article class="report-item" data-offer-id="${escapeHtml(externalId)}">
-          <div class="report-item-head">
-            <strong>#${escapeHtml(externalId || "—")}</strong>
-            <span>${escapeHtml(offer.status || "")}</span>
+        <article class="report-offer-card" data-offer-id="${escapeHtml(externalId)}">
+          <div class="report-offer-row">
+            <div class="report-offer-id-block">
+              <span>#${escapeHtml(externalId || "—")}</span>
+            </div>
+            <div class="report-offer-info">
+              <p>${message}</p>
+            </div>
           </div>
-          ${errors || warnings || "<p>Подробности отсутствуют</p>"}
-          ${
-            offer.url
-              ? `<a href="${offer.url}" target="_blank" rel="noopener noreferrer">Открыть объявление</a>`
-              : ""
-          }
-          <div class="report-actions">
-            <button class="primary" data-offer-action="edit" data-offer-id="${escapeHtml(externalId)}">Редактировать</button>
+          <div class="report-offer-actions">
             <button data-offer-action="open" data-offer-url="${offer.url || ""}" ${
               offer.url ? "" : "disabled"
             }>Открыть объявление</button>
-            <button data-offer-action="change-area" data-offer-id="${escapeHtml(externalId)}">Изменить жилую площадь</button>
+            <button class="primary" data-offer-action="edit" data-offer-id="${escapeHtml(externalId)}">Редактировать</button>
           </div>
         </article>
       `;
     })
     .join("");
 };
+
 
 const renderImages = (items = []) => {
   cachedImages = items;
@@ -248,6 +257,7 @@ areaModal?.addEventListener("click", (event) => {
   if (event.target === areaModal) closeAreaModal();
 });
 
+
 areaForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!areaObjectId) return;
@@ -277,7 +287,6 @@ offersEl?.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-offer-action]");
   if (!button) return;
   const externalId = button.dataset.offerId;
-  const card = button.closest(".report-item");
   try {
     switch (button.dataset.offerAction) {
       case "edit":
@@ -289,9 +298,6 @@ offersEl?.addEventListener("click", async (event) => {
         } else {
           openListingsPage(externalId);
         }
-        break;
-      case "change-area":
-        openAreaModal(externalId);
         break;
       default:
         break;

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Поиск · HAPPINESS CRM</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="search">
+    <header class="app-header">
+      <button class="header-pill" data-nav="primary">Назад</button>
+      <div class="header-title">
+        <strong>Поиск объектов</strong>
+      </div>
+    </header>
+
+    <main class="search-layer">
+      <div class="search-card compact">
+        <div class="search-head compact">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Адрес, ID или ЖК"
+            autocomplete="off"
+          />
+          <input
+            type="text"
+            id="priceInput"
+            placeholder="Цена, ₽"
+            inputmode="numeric"
+            autocomplete="off"
+          />
+        </div>
+        <div class="search-toolbar">
+          <button type="button" id="filterButton" class="history-toggle">История</button>
+          <div class="sort-pills">
+            <button type="button" class="sort-pill active" data-sort="default">Сначала новые</button>
+            <button type="button" class="sort-pill" data-sort="id">ID ↑</button>
+            <button type="button" class="sort-pill" data-sort="price">Цена ↑</button>
+          </div>
+        </div>
+        <div id="filterPanel" class="filter-panel hidden">
+          <div class="filter-head">
+            <span class="filter-title">История поиска</span>
+            <button type="button" id="clearHistoryButton" class="history-clear">Очистить</button>
+          </div>
+          <div id="searchHistoryList" class="history-chips"></div>
+        </div>
+        <section id="objectsList" class="objects-list">
+          <div class="empty-state">
+            Введите ID, адрес или название ЖК
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div id="detailModal" class="modal hidden">
+      <div class="modal-content">
+        <button id="modalClose" class="modal-close" aria-label="Закрыть">×</button>
+        <div id="detailBody"></div>
+      </div>
+    </div>
+
+    <div id="lightbox" class="lightbox hidden">
+      <button id="lightboxClose" class="lightbox-close" aria-label="Закрыть">×</button>
+      <button class="lightbox-nav prev" aria-label="Предыдущее фото">‹</button>
+      <img id="lightboxImage" alt="Фото объекта" />
+      <button class="lightbox-nav next" aria-label="Следующее фото">›</button>
+    </div>
+
+    <nav class="bottom-nav single" data-nav="search">
+      <a class="nav-button" href="/home.html">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Кабинет</span>
+      </a>
+    </nav>
+
+    <script type="module" src="/static/scripts/header.js"></script>
+    <script type="module" src="/static/scripts/app.js"></script>
+  </body>
+</html>

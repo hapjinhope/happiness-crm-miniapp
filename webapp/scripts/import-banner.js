@@ -9,11 +9,20 @@ const formatTimeLabel = (iso) => {
   }
 };
 
+const extractTimestamp = (result = {}) =>
+  result.lastProcessDate ||
+  result.last_process_date ||
+  result.lastFeedCheckDate ||
+  result.last_feed_check_date ||
+  result.lastCheckDate ||
+  result.last_check_date ||
+  null;
+
 const formatDisplayTime = (ms) => {
   const minutes = Math.max(0, Math.ceil(ms / 60000));
-  if (minutes > 1) return `через ${minutes} мин`;
-  if (minutes === 1) return "через 1 мин";
-  if (ms > 0) return "менее чем через минуту";
+  if (minutes > 1) return `${minutes} мин`;
+  if (minutes === 1) return "1 мин";
+  if (ms > 0) return "менее минуты";
   return "сейчас";
 };
 
@@ -30,37 +39,55 @@ const hasImageProblems = (report) => {
 };
 
 export const initImportBanner = (options = {}) => {
-  const titleEl = document.getElementById("importBannerTitle");
   const subtitleEl = document.getElementById("importBannerSubtitle");
   const timeEl = document.getElementById("importBannerTime");
   const banner = document.getElementById("importBanner");
-  if (!banner || !titleEl || !subtitleEl || !timeEl) return;
+  if (!banner || !subtitleEl || !timeEl) return;
 
   let lastInfo = null;
   let pollTimeout = null;
   let countdownInterval = null;
   let nextPollTime = Date.now() + POLL_INTERVAL_MS;
+  let lastKnownTimestamp = null;
 
-  const updateBannerState = (hasProblems = false) => {
+  const updateBannerState = (hasProblems = false, timestampOverride = null) => {
     if (!lastInfo?.result) return;
     const result = lastInfo.result;
     const warning = Boolean(hasProblems);
     banner.dataset.state = warning ? "warn" : "ok";
-    titleEl.textContent = warning ? "Обнаружены проблемы" : "Все объявления прошли проверку";
-    subtitleEl.textContent = `Последнее обновление: ${formatTimeLabel(
-      result.lastProcessDate || result.lastFeedCheckDate
-    )}`;
+    const timestamp =
+      timestampOverride ||
+      extractTimestamp(result) ||
+      lastKnownTimestamp ||
+      new Date().toISOString();
+    lastKnownTimestamp = timestamp;
+    subtitleEl.textContent = formatTimeLabel(timestamp);
     const remaining = Math.max(0, nextPollTime - Date.now());
-    timeEl.textContent = `Следующая проверка ${formatDisplayTime(remaining)}`;
+    timeEl.textContent = formatDisplayTime(remaining);
   };
 
   const setBannerError = (message) => {
     banner.dataset.state = "error";
-    titleEl.textContent = "Не удалось получить статус";
-    subtitleEl.textContent = message || "CIAN API временно недоступно";
+    const nowIso = new Date().toISOString();
+    lastKnownTimestamp = nowIso;
+    subtitleEl.textContent = message
+      ? `${message} · ${formatTimeLabel(nowIso)}`
+      : formatTimeLabel(nowIso);
     const remaining = Math.max(0, nextPollTime - Date.now());
-    timeEl.textContent = `Следующая проверка ${formatDisplayTime(remaining)}`;
+    timeEl.textContent = formatDisplayTime(remaining || POLL_INTERVAL_MS);
   };
+
+  const hasOfferProblems = (offers = []) =>
+    offers.some((offer) => {
+      const errors = Array.isArray(offer.errors) ? offer.errors : [];
+      const warnings = Array.isArray(offer.warnings) ? offer.warnings : [];
+      const status = String(offer.status || "").toLowerCase();
+      return (
+        errors.length > 0 ||
+        warnings.length > 0 ||
+        ["error", "refus", "block", "warn", "не прош"].some((token) => status.includes(token))
+      );
+    });
 
   const fetchBannerData = async () => {
     try {
@@ -76,9 +103,14 @@ export const initImportBanner = (options = {}) => {
       const report = await reportRes.json();
       const images = await imagesRes.json();
       lastInfo = info;
-      const problematic = filterProblemOffers(report.result?.offers || []);
+      const offers = report.result?.offers || [];
+      const problematic = filterProblemOffers(offers);
+      const offerStatusIssues = hasOfferProblems(offers);
       const imageIssues = hasImageProblems(images);
-      updateBannerState(problematic.length > 0 || imageIssues);
+      const timestamp =
+        extractTimestamp(info.result || {}) || info.result?.lastProcessDate || new Date().toISOString();
+      lastKnownTimestamp = timestamp;
+      updateBannerState(problematic.length > 0 || offerStatusIssues || imageIssues, timestamp);
       fetch("/api/cian/status-sync", { method: "POST" }).catch(() => {});
     } catch (error) {
       setBannerError(error.message);
@@ -91,7 +123,7 @@ export const initImportBanner = (options = {}) => {
     nextPollTime = Date.now() + POLL_INTERVAL_MS;
     const updateCountdown = () => {
       const remaining = Math.max(0, nextPollTime - Date.now());
-      timeEl.textContent = `Следующая проверка ${formatDisplayTime(remaining)}`;
+      timeEl.textContent = formatDisplayTime(remaining);
     };
     updateCountdown();
     countdownInterval = setInterval(updateCountdown, 1000);

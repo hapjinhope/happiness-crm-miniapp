@@ -7,13 +7,10 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body data-page="cabinet">
-    <header class="app-header compact">
-      <div class="brand">
-        <span class="brand-badge">HC</span>
-        <div class="brand-text">
-          <div class="brand-title">Мои объявления</div>
-          <div class="brand-subtitle">активные объекты</div>
-        </div>
+    <header class="app-header">
+      <button class="header-pill" data-nav="primary">Назад</button>
+      <div class="header-title">
+        <strong>Мои объявления</strong>
       </div>
     </header>
 
@@ -25,7 +22,6 @@
           placeholder="Поиск по адресу, ID или ЖК"
           autocomplete="off"
         />
-        <p class="search-caption">Поиск</p>
       </div>
       <div class="listing-tabs" id="listingTabs">
         <button class="listing-tab active" data-filter="published">Опубликовано</button>
@@ -36,8 +32,6 @@
         <div class="empty-state">Загрузка объявлений...</div>
       </section>
     </main>
-
-    <div class="app-version-chip" id="appVersionChip">HAPPINESS CRM · Beta 0.1.0-beta.3</div>
 
     <div id="detailModal" class="modal hidden">
       <div class="modal-content">
@@ -52,45 +46,24 @@
       <img id="lightboxImage" alt="Фото объекта" />
       <button class="lightbox-nav next" aria-label="Следующее фото">›</button>
     </div>
-
-    <nav class="bottom-nav">
-      <a class="nav-item" data-target="home" href="/stub.html?view=home">
-        <span class="nav-icon">🏠</span>
-        <span class="nav-label">Главная</span>
-        <small>🚧 в разработке</small>
-      </a>
-      <a class="nav-item" data-target="favorites" href="/stub.html?view=favorites">
-        <span class="nav-icon">❤️</span>
-        <span class="nav-label">Избранное</span>
-        <small>🚧 в разработке</small>
-      </a>
-      <a class="nav-item nav-search" data-target="search" href="/search.html">
-        <span class="nav-icon">🔍</span>
-      </a>
-      <a class="nav-item" data-target="messages" href="/stub.html?view=messages">
-        <span class="nav-icon">💬</span>
-        <span class="nav-label">Сообщения</span>
-        <small>🚧 в разработке</small>
-      </a>
-      <a class="nav-item" data-target="cabinet" href="/cabinet.html">
-        <span class="nav-icon">👤</span>
-        <span class="nav-label">Кабинет</span>
-      </a>
-    </nav>
-
-    <div id="listingSheet" class="action-sheet hidden">
-      <div class="sheet-content">
-        <div class="sheet-header">
-          <strong>Действия с объявлением</strong>
-          <button id="sheetClose" aria-label="Закрыть">×</button>
+    <div id="deleteModal" class="modal hidden">
+      <div class="modal-content confirm-modal">
+        <button id="deleteModalClose" class="modal-close" aria-label="Закрыть">×</button>
+        <h3 id="deleteModalTitle">Удаление объявления</h3>
+        <div class="confirm-actions">
+          <button type="button" id="deleteRelistBtn" class="ghost">Перевыставить</button>
+          <button type="button" id="deleteConfirmBtn" class="danger">Удалить</button>
         </div>
-        <div class="sheet-actions">
-          <button data-action="edit">Редактировать объявление</button>
-          <button data-action="collection">Добавить в подборку</button>
-          <button data-action="stats" disabled>Статистика (в разработке)</button>
-          <button data-action="share" disabled>Поделиться (в разработке)</button>
-          <button data-action="archive" disabled>Перенести в архив (в разработке)</button>
-          <button data-action="delete">Удалить объявление</button>
+        <p id="deleteModalStatus" class="modal-status"></p>
+      </div>
+    </div>
+    <div id="actionConfirmModal" class="modal hidden">
+      <div class="modal-content confirm-modal compact">
+        <button type="button" class="modal-close" data-close-modal="actionConfirmModal" aria-label="Закрыть">×</button>
+        <p id="actionConfirmText" class="modal-subtitle">Подтвердите действие</p>
+        <div class="confirm-actions">
+          <button type="button" id="actionConfirmYes" class="primary">Да</button>
+          <button type="button" id="actionConfirmNo" class="ghost">Отмена</button>
         </div>
       </div>
     </div>
@@ -114,10 +87,14 @@
       <button type="button" data-photo-action="delete" class="danger">Удалить</button>
       <button type="button" data-photo-action="close">Отмена</button>
     </div>
+    <div id="cardMenu" class="card-menu hidden">
+      <button type="button" data-card-action="edit">Редактировать</button>
+      <button type="button" data-card-action="delete" class="danger">Удалить</button>
+    </div>
     <input type="file" id="photoFileInput" accept="image/*" class="hidden-file-input" />
 
-    <script type="module" src="/static/app.js"></script>
-    <script type="module" src="/static/listings.js"></script>
-    <script type="module" src="/static/nav.js"></script>
+    <script type="module" src="/static/scripts/header.js"></script>
+    <script type="module" src="/static/scripts/app.js"></script>
+    <script type="module" src="/static/scripts/listings.js"></script>
   </body>
 </html>

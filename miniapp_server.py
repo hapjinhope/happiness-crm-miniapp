@@ -1,8 +1,10 @@
 import os
 from collections import OrderedDict
 import logging
+import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+import html
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -23,6 +25,9 @@ NOTIFY_BOT_TOKEN = os.getenv("NOTIFY_BOT_TOKEN")
 NOTIFY_CHAT_ID = os.getenv("NOTIFY_CHAT_ID")
 NOTIFY_THREAD_ID = os.getenv("NOTIFY_THREAD_ID")
 CIAN_API_TOKEN = os.getenv("CIAN_API_TOKEN")
+SHOWING_BOT_TOKEN = os.getenv("SHOWING_BOT_TOKEN")
+SHOWING_CHAT_ID = os.getenv("SHOWING_CHAT_ID")
+SHOWING_THREAD_ID = os.getenv("SHOWING_THREAD_ID")
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for the mini app server.")
@@ -75,19 +80,127 @@ def _map_cian_status(value: Optional[str]) -> Optional[str]:
     return None
 
 
+def _build_cian_listing_url(object_id: Any) -> Optional[str]:
+    if object_id is None:
+        return None
+    digits = "".join(ch for ch in str(object_id) if ch.isdigit())
+    if not digits:
+        return None
+    return f"https://www.cian.ru/rent/flat/{digits}/"
+
+
+def _is_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        return normalized in {"", "EMPTY", "NULL", "NONE"}
+    return False
+
+
+def _extract_cian_digits(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        digits = re.sub(r"\D", "", str(int(value)))
+        return digits or None
+    if isinstance(value, str):
+        match = re.search(r"(\d{5,})", value)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _ensure_cian_identifiers(item: Dict[str, Any]) -> None:
+    object_id = item.get(OBJECT_ID_COLUMN) or item.get("id")
+    if object_id is None:
+        return
+
+    cian_id_existing = item.get("cian_id")
+    cian_url_existing = item.get("cian_url")
+
+    digits = None if _is_missing(cian_id_existing) else _extract_cian_digits(cian_id_existing)
+    if not digits:
+        for candidate in (
+            item.get("external_id"),
+            object_id,
+            cian_url_existing,
+        ):
+            digits = _extract_cian_digits(candidate)
+            if digits:
+                break
+
+    url = None if _is_missing(cian_url_existing) else cian_url_existing
+    if not url and digits:
+        url = _build_cian_listing_url(digits)
+
+    payload: Dict[str, Any] = {}
+    if digits and (_is_missing(cian_id_existing) or cian_id_existing != digits):
+        payload["cian_id"] = digits
+        item["cian_id"] = digits
+    if url and _is_missing(cian_url_existing):
+        payload["cian_url"] = url
+        item["cian_url"] = url
+
+    if payload:
+        try:
+            supabase_client.update_object(str(object_id), payload)
+        except HTTPError as exc:
+            logging.warning("Не удалось обновить cian данные объекта %s: %s", object_id, exc)
+
+
+CLIENT_GROUP_LABELS = {
+    "family": "Семья",
+    "couple": "Пара",
+    "single": "Один человек",
+    "company": "Компания",
+    "staff": "Сотрудники",
+}
+
+
+def _escape_label(value: Optional[Any], placeholder: str = "—") -> str:
+    if value is None:
+        return html.escape(placeholder)
+    text = str(value).strip()
+    return html.escape(text or placeholder)
+
+
+def _short_address_label(address: Optional[str]) -> str:
+    if not address:
+        return "Адрес не указан"
+    parts = [part.strip() for part in str(address).split(",") if part.strip()]
+    filtered: List[str] = []
+    for part in reversed(parts):
+        if filtered and any(char.isdigit() for char in filtered[0]) and not any(char.isdigit() for char in part):
+            filtered.insert(0, part)
+            break
+        filtered.insert(0, part)
+        if any(char.isdigit() for char in part) and len(filtered) >= 2:
+            break
+    cleaned = [segment for segment in filtered if not re.search(r"\b(АО|р-н|округ|district)\b", segment, re.IGNORECASE)]
+    target = cleaned or filtered or parts
+    return ", ".join(target[-2:]) or address
+
+
 def sync_cian_statuses() -> int:
     data = _call_cian("/v1/get-order")
     offers = data.get("result", {}).get("offers") or []
     updated = 0
     for offer in offers:
-        external_id = offer.get("externalId") or offer.get("offerId")
+        external_id = offer.get("externalId")
         if not external_id:
             continue
         status = _map_cian_status(offer.get("status"))
         if not status:
             continue
+        payload: Dict[str, Any] = {"status": status}
+        cian_offer_id = offer.get("offerId") or offer.get("id") or offer.get("cianId")
+        digits = _extract_cian_digits(cian_offer_id)
+        if digits:
+            payload["cian_id"] = digits
+            payload["cian_url"] = _build_cian_listing_url(digits)
         try:
-            supabase_client.update_object(str(external_id), {"status": status})
+            supabase_client.update_object(str(external_id), payload)
             updated += 1
         except HTTPError:
             continue
@@ -172,10 +285,40 @@ def notify_cian_problems(report: Dict[str, Any]) -> None:
     send_notify_message("\n".join(lines))
 
 
+def send_showing_message(text: str) -> None:
+    if not SHOWING_BOT_TOKEN or not SHOWING_CHAT_ID:
+        logging.warning("SHOWING_BOT_TOKEN or SHOWING_CHAT_ID is missing; skipping notification")
+        return
+    payload: Dict[str, Any] = {
+        "chat_id": SHOWING_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+    }
+    if SHOWING_THREAD_ID:
+        payload["message_thread_id"] = int(SHOWING_THREAD_ID)
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{SHOWING_BOT_TOKEN}/sendMessage",
+            json=payload,
+            timeout=10,
+        ).raise_for_status()
+    except requests.RequestException as exc:
+        logging.warning("Failed to send showing notification: %s", exc)
+
+
 @app.get("/api/objects")
-def list_objects(q: Optional[str] = Query(default=None, description="Поиск по ID или адресу"), limit: int = 100):
+def list_objects(
+    q: Optional[str] = Query(default=None, description="Поиск по ID или адресу"),
+    limit: int = 100,
+    moderator: Optional[bool] = Query(default=None),
+):
     try:
         aggregated: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+        data: List[Dict[str, Any]] = []
+
+        moderator_filter = None
+        if moderator is not None:
+            moderator_filter = {"moderator": f"eq.{str(moderator).lower()}"}
 
         if q:
             term = q.strip()
@@ -188,7 +331,7 @@ def list_objects(q: Optional[str] = Query(default=None, description="Поиск 
                 if exc.response.status_code not in (400, 404):
                     raise
 
-            all_items = supabase_client.list_objects(limit=min(limit, 200))
+            all_items = supabase_client.list_objects(limit=min(limit, 200), filters=moderator_filter)
             term_lower = term.lower()
             for item in all_items:
                 identifier = str(item.get(OBJECT_ID_COLUMN) or item.get("id") or len(aggregated))
@@ -207,13 +350,17 @@ def list_objects(q: Optional[str] = Query(default=None, description="Поиск 
             else:
                 data = all_items[:limit]
         else:
-            data = supabase_client.list_objects(limit=min(limit, 200))
+            data = supabase_client.list_objects(limit=min(limit, 200), filters=moderator_filter)
+
+        for item in data:
+            _ensure_cian_identifiers(item)
 
         simplified = [
             {
                 "id": item.get(OBJECT_ID_COLUMN) or item.get("id"),
                 "address": item.get("address") or item.get("full_address"),
                 "price": item.get("price") or item.get("price_total") or item.get("price_rub"),
+                "cian_url": item.get("cian_url"),
                 "raw": item,
             }
             for item in data
@@ -224,6 +371,33 @@ def list_objects(q: Optional[str] = Query(default=None, description="Поиск 
     except RequestsConnectionError as exc:
         raise HTTPException(status_code=502, detail="Не удалось подключиться к Supabase") from exc
 
+@app.get("/api/moderation")
+def moderation_objects(limit: int = 50):
+    try:
+        items = supabase_client.list_objects(limit=min(limit, 200), filters={"moderator": "eq.false"})
+        for item in items:
+            _ensure_cian_identifiers(item)
+        simplified = [
+            {
+                "id": item.get(OBJECT_ID_COLUMN) or item.get("id"),
+                "address": item.get("address") or item.get("full_address"),
+                "raw": item,
+            }
+            for item in items
+        ]
+        return {"items": simplified}
+    except HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Ошибка Supabase: {exc.response.text}") from exc
+
+
+@app.get("/api/moderation/count")
+def moderation_count():
+    try:
+        count = supabase_client.count_records("objects", {"moderator": "eq.false"})
+        return {"count": count}
+    except HTTPError as exc:
+        logging.warning("Не удалось получить очередь модерации: %s", exc)
+        return {"count": 0, "detail": exc.response.text if exc.response else "Supabase error"}
 
 @app.get("/api/objects/{object_id}")
 def get_object(object_id: str):
@@ -233,6 +407,7 @@ def get_object(object_id: str):
         raise HTTPException(status_code=502, detail=f"Ошибка Supabase: {exc.response.text}") from exc
     if not obj:
         raise HTTPException(status_code=404, detail="Объект не найден")
+    _ensure_cian_identifiers(obj)
     return obj
 
 
@@ -250,14 +425,39 @@ def update_object(object_id: str, payload: Dict[str, Any]):
 
 
 @app.delete("/api/objects/{object_id}")
-def delete_object_route(object_id: str):
+def delete_object_route(object_id: str, mode: str = Query(default="delete")):
+    mode = mode.lower()
+    if mode not in {"delete", "relist", "owner"}:
+        raise HTTPException(status_code=400, detail="mode должен быть delete, relist или owner")
+    try:
+        obj = supabase_client.get_object(object_id)
+    except HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Ошибка Supabase: {exc.response.text}") from exc
+    if not obj:
+        raise HTTPException(status_code=404, detail="Объект не найден")
+
+    owner_id = _resolve_owner_id(obj)
+
     try:
         deleted = supabase_client.delete_object(object_id)
     except HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Ошибка Supabase: {exc.response.text}") from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="Объект не найден")
-    return {"status": "ok"}
+
+    if owner_id:
+        if mode == "delete":
+            parsed_value = True
+        elif mode == "relist":
+            parsed_value = False
+        else:
+            parsed_value = "owner"
+        try:
+            supabase_client.update_record("owners", "id", owner_id, {"parsed": parsed_value})
+        except HTTPError as exc:
+            logging.warning("Не удалось обновить владельца %s: %s", owner_id, exc)
+
+    return {"status": "ok", "mode": mode}
 
 
 @app.get("/api/owners/{owner_id}")
@@ -273,32 +473,43 @@ def get_owner(owner_id: str):
 
 @app.get("/")
 def index():
-    return FileResponse(WEBAPP_DIR / "cabinet.html")
+    return FileResponse(WEBAPP_DIR / "pages" / "home.html")
+
+
+@app.get("/home.html")
+def home_page():
+    return FileResponse(WEBAPP_DIR / "pages" / "home.html")
 
 
 @app.get("/cabinet.html")
 def cabinet():
-    return FileResponse(WEBAPP_DIR / "cabinet.html")
+    return FileResponse(WEBAPP_DIR / "pages" / "cabinet.html")
 
 
 @app.get("/stub.html")
 def stub():
-    return FileResponse(WEBAPP_DIR / "stub.html")
+    return FileResponse(WEBAPP_DIR / "pages" / "stub.html")
 
 
 @app.get("/search.html")
 def search_page():
-    return FileResponse(WEBAPP_DIR / "search.html")
+    return FileResponse(WEBAPP_DIR / "pages" / "search.html")
+
+
+@app.get("/moderation.html")
+@app.get("/moderation")
+def moderation_page():
+    return FileResponse(WEBAPP_DIR / "pages" / "moderation.html")
 
 
 @app.get("/listings.html")
 def listings_page():
-    return FileResponse(WEBAPP_DIR / "listings.html")
+    return FileResponse(WEBAPP_DIR / "pages" / "listings.html")
 
 
 @app.get("/cian-report.html")
 def cian_report_page():
-    return FileResponse(WEBAPP_DIR / "cian-report.html")
+    return FileResponse(WEBAPP_DIR / "pages" / "cian-report.html")
 
 
 @app.get("/api/cian/order-info")
@@ -353,6 +564,96 @@ def cian_status_sync_route():
     except requests.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"CIAN API error: {exc}") from exc
     return {"updated": updated}
+
+
+@app.post("/api/showings")
+def create_showing(payload: Dict[str, Any]):
+    object_id = payload.get("object_id")
+    if not object_id:
+        raise HTTPException(status_code=400, detail="object_id обязателен")
+    owner_input = payload.get("owner") or {}
+    client_input = payload.get("client") or {}
+    schedule = payload.get("schedule") or {}
+    if not schedule.get("date") or not schedule.get("time"):
+        raise HTTPException(status_code=400, detail="Укажите дату и время показа")
+    try:
+        obj = supabase_client.get_object(str(object_id))
+    except HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Ошибка Supabase: {exc.response.text}") from exc
+    if not obj:
+        raise HTTPException(status_code=404, detail="Объект не найден")
+    _ensure_cian_identifiers(obj)
+
+    owners_id = obj.get("owners_id") or obj.get("owner_id")
+    owner_record: Optional[Dict[str, Any]] = None
+    if owners_id:
+        try:
+            owner_record = supabase_client.get_record("owners", "id", owners_id)
+        except HTTPError:
+            owner_record = None
+
+    address = obj.get("address") or obj.get("full_address") or obj.get("location") or "Адрес не указан"
+    short_address = _short_address_label(address)
+    schedule_label = f"{schedule.get('date')} · {schedule.get('time')}"
+
+    owner_name = (
+        owner_input.get("name")
+        or (owner_record.get("name") if owner_record else None)
+        or "—"
+    )
+    owner_phone_input = owner_input.get("phone")
+    owner_phone_label = (
+        owner_phone_input
+        or (owner_record.get("phone") if owner_record else None)
+        or "—"
+    )
+
+    lines = [
+        "🎬 Новый показ",
+        f"🏷️ ID: #{_escape_label(object_id)}",
+        f"📍 {_escape_label(short_address)}",
+        f"🗓 {_escape_label(schedule_label)}",
+        "",
+        "🧑‍💼 Собственник",
+        f"{_escape_label(owner_name)} · {_escape_label(owner_phone_label)}",
+    ]
+    if owner_input.get("notes"):
+        lines.append(f"📝 {_escape_label(owner_input['notes'])}")
+
+    client_name = client_input.get("name") or "—"
+    client_phone = client_input.get("phone") or "—"
+    client_group_label = CLIENT_GROUP_LABELS.get(
+        client_input.get("group"),
+        client_input.get("group") or "—",
+    )
+    children_value = str(client_input.get("children") or "0").strip() or "0"
+    pets_value = (client_input.get("pets") or "").strip().lower()
+    pets_label = "Да" if pets_value in {"да", "yes", "true"} else "Нет"
+
+    lines.extend(
+        [
+            "",
+            "🧑‍🤝‍🧑 Клиент",
+            f"{_escape_label(client_name)} · {_escape_label(client_phone)}",
+            f"👥 {_escape_label(client_group_label)}",
+            f"👶 Дети: {_escape_label(children_value)}",
+            f"🐾 Питомцы: {_escape_label(pets_label)}",
+        ]
+    )
+    if client_input.get("notes"):
+        lines.append(f"📌 {_escape_label(client_input['notes'])}")
+
+    cian_url = obj.get("cian_url") or _build_cian_listing_url(object_id)
+    owner_url = owner_record.get("url") if owner_record else None
+    if cian_url or owner_url:
+        lines.append("")
+    if cian_url:
+        lines.append(f"🔗 <a href=\"{html.escape(cian_url)}\">Объявление</a>")
+    if owner_url:
+        lines.append(f"👤 <a href=\"{html.escape(owner_url)}\">Собственник</a>")
+
+    send_showing_message("\n".join(lines))
+    return {"status": "ok"}
 def _digits(value: str) -> str:
     return "".join(ch for ch in str(value) if ch.isdigit())
 
@@ -371,3 +672,11 @@ def _item_price_matches(item: Dict[str, Any], digits: str) -> bool:
         if digits in value_digits:
             return True
     return False
+
+
+def _resolve_owner_id(obj: Dict[str, Any]) -> Optional[str]:
+    for key in ("owners_id", "owner_id", "ownersId", "ownerId"):
+        value = obj.get(key)
+        if value:
+            return str(value)
+    return None

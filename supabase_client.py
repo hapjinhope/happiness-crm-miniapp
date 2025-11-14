@@ -55,6 +55,21 @@ class SupabaseClient:
         data = response.json()
         return data[0] if data else payload
 
+    def update_record(self, table: str, column: str, value: Any, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        url = self.base_url.rstrip("/") + f"/rest/v1/{table}"
+        headers = build_headers(self.api_key)
+        headers["Prefer"] = "return=representation"
+        response = self.session.patch(
+            url,
+            headers=headers,
+            params={column: f"eq.{value}"},
+            json=payload,
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data[0] if data else None
+
     def delete_object(self, object_id: str, object_id_column: Optional[str] = None) -> bool:
         column = object_id_column or self.object_id_column
         headers = build_headers(self.api_key)
@@ -71,7 +86,13 @@ class SupabaseClient:
             return True
         return bool(response.json())
 
-    def list_objects(self, search: Optional[str] = None, limit: int = 50, select: str = "*") -> List[Dict[str, Any]]:
+    def list_objects(
+        self,
+        search: Optional[str] = None,
+        limit: int = 50,
+        select: str = "*",
+        filters: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
         base_params: Dict[str, Any] = {
             "select": select,
             "limit": limit,
@@ -81,6 +102,8 @@ class SupabaseClient:
         def fetch(extra_params: Dict[str, Any]) -> List[Dict[str, Any]]:
             params = base_params.copy()
             params.update(extra_params)
+            if filters:
+                params.update(filters)
             response = self.session.get(
                 self._rest_url(),
                 headers=build_headers(self.api_key),
@@ -131,6 +154,23 @@ class SupabaseClient:
 
         # fallback to default listing if nothing matched
         return fetch({})
+
+    def count_records(self, table: str, filters: Optional[Dict[str, str]] = None) -> int:
+        url = self.base_url.rstrip("/") + f"/rest/v1/{table}"
+        headers = build_headers(self.api_key)
+        headers["Prefer"] = "count=exact"
+        params = {"select": "id", "limit": 1}
+        if filters:
+            params.update(filters)
+        response = self.session.get(url, headers=headers, params=params, timeout=15)
+        response.raise_for_status()
+        content_range = response.headers.get("Content-Range")
+        if content_range and "/" in content_range:
+            try:
+                return int(content_range.split("/")[-1])
+            except ValueError:
+                pass
+        return len(response.json())
 def _digits(value: Any) -> str:
     return "".join(ch for ch in str(value) if ch.isdigit())
 

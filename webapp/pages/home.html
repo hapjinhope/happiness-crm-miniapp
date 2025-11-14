@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Главная · HAPPINESS CRM</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="home">
+    <header class="app-header">
+      <button class="header-pill" data-nav="primary">Закрыть</button>
+      <div class="header-title">
+        <strong>Личный кабинет</strong>
+      </div>
+    </header>
+
+    <main class="app-content emerald-home">
+      <section class="status-strip" id="importBanner" data-state="ok">
+        <span class="status-dot"></span>
+        <div class="status-body">
+          <span class="status-update">Последнее обновление: <strong id="importBannerSubtitle">—</strong></span>
+        </div>
+        <span class="status-timer" id="importBannerTime">—</span>
+      </section>
+
+      <section class="action-stack">
+        <a class="action-card action-card--wide" href="#" data-action="open-publish">
+          <span class="action-label">+ Разместить объявление</span>
+        </a>
+
+        <div class="action-grid">
+          <a class="action-card action-card--tile" href="/listings.html">
+            <span class="action-tile-icon">🏙️</span>
+            <strong>Объекты</strong>
+          </a>
+          <a class="action-card action-card--tile" href="#" data-action="open-showing">
+            <span class="action-tile-icon">🎬</span>
+            <strong>Создать показ</strong>
+          </a>
+          <a class="action-card action-card--tile" href="/moderation.html">
+            <span class="action-tile-icon">🛡️</span>
+            <strong>Модерация</strong>
+            <span class="action-badge hidden" id="moderationBadge">0</span>
+          </a>
+        <a class="action-card action-card--tile disabled" href="/stub.html?view=stats">
+            <span class="action-tile-icon">📈</span>
+            <strong>Статистика</strong>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <div id="publishModal" class="modal hidden">
+      <div class="modal-content action-modal">
+        <button class="modal-close" data-close-modal="publishModal" aria-label="Закрыть">×</button>
+        <div class="action-modal-body">
+          <h3>Разместить объявление</h3>
+          <div class="publish-options">
+            <button type="button" class="publish-option" id="publishLinkButton">Добавить ссылку</button>
+            <div class="publish-link-field hidden" id="publishLinkField">
+              <label for="publishLinkInput">URL объявления</label>
+              <input type="url" id="publishLinkInput" placeholder="Ваша URL" />
+              <button type="button" id="publishLinkSubmit" class="primary hidden" disabled>Добавить</button>
+            </div>
+            <button type="button" class="publish-option locked" id="publishFormButton" disabled>
+              <span>Заполнить данные</span>
+              <span class="lock-badge">скоро</span>
+            </button>
+          </div>
+          <p class="modal-status" id="publishLinkStatus"></p>
+        </div>
+      </div>
+    </div>
+
+    <div id="showingModal" class="modal hidden">
+      <div class="modal-content action-modal showing-modal">
+        <button class="modal-close" data-close-modal="showingModal" aria-label="Закрыть">×</button>
+        <div class="action-modal-body">
+          <h3>Создание показа</h3>
+          <div class="wizard-step" data-step="object">
+          <button type="button" class="wizard-title" data-toggle-step="object">
+            <span>1. Выбор объекта</span>
+            <span class="wizard-status" data-summary-label="object">не выбран</span>
+          </button>
+          <div class="wizard-body active" id="wizardObjectBody">
+            <div class="object-quick-search">
+              <input
+                type="search"
+                id="showingObjectSearch"
+                placeholder="Начните вводить ID или адрес"
+                autocomplete="off"
+              />
+              <div id="showingObjectSuggestions" class="object-suggestion-panel hidden">
+                <div class="empty-state">Загрузка объектов...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-step" data-step="owner">
+          <button type="button" class="wizard-title" data-toggle-step="owner">
+            <span>2. Собственник</span>
+            <span class="wizard-status" data-summary-label="owner">ожидает</span>
+          </button>
+          <div class="wizard-body" id="wizardOwnerBody">
+            <form id="ownerForm" class="wizard-form">
+              <label>
+                Имя
+                <input type="text" name="name" required />
+              </label>
+              <div class="phone-stack">
+                <button type="button" id="ownerCallToggle" class="owner-call-btn" aria-pressed="false">
+                  Связь через объявление
+                </button>
+                <label class="phone-input-wrapper">
+                  Телефон
+                  <input type="tel" name="phone" data-owner-phone required />
+                </label>
+              </div>
+              <label>
+                Информация
+                <textarea name="notes" rows="3" placeholder="Комментарий"></textarea>
+              </label>
+              <button type="submit" class="primary">Сохранить данные собственника</button>
+            </form>
+          </div>
+        </div>
+        <div class="wizard-step" data-step="client">
+          <button type="button" class="wizard-title" data-toggle-step="client">
+            <span>3. Клиент</span>
+            <span class="wizard-status" data-summary-label="client">ожидает</span>
+          </button>
+          <div class="wizard-body" id="wizardClientBody">
+            <form id="clientForm" class="wizard-form">
+              <label>
+                Имя
+                <input type="text" name="name" required />
+              </label>
+              <label>
+                Телефон
+                <input type="tel" name="phone" required />
+              </label>
+              <div class="client-flow">
+                <div class="client-group">
+                  <span>Состав</span>
+                  <div class="segment-group" id="clientGroupSegment">
+                    <button type="button" data-group-value="family">Семья</button>
+                    <button type="button" data-group-value="couple">Пара</button>
+                    <button type="button" data-group-value="single">Один человек</button>
+                    <button type="button" data-group-value="company">Компания</button>
+                    <button type="button" data-group-value="staff">Сотрудники</button>
+                  </div>
+                </div>
+                <div class="client-children">
+                  <span>Дети</span>
+                  <div class="counter" data-counter="children">
+                    <button type="button" data-counter-action="dec">−</button>
+                    <span data-counter-value>0</span>
+                    <button type="button" data-counter-action="inc">+</button>
+                  </div>
+                </div>
+                <div class="client-pets">
+                  <span>Питомцы</span>
+                  <div class="segment-group compact" id="clientPetsSegment">
+                    <button type="button" data-pets-value="yes">Да</button>
+                    <button type="button" data-pets-value="no">Нет</button>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" name="group" id="clientGroupValue" value="family" />
+              <input type="hidden" name="children" id="clientChildrenValue" value="0" />
+              <input type="hidden" name="pets" id="clientPetsValue" value="нет" />
+              <label>
+                Информация
+                <textarea name="notes" rows="3"></textarea>
+              </label>
+              <button type="submit" class="primary">Сохранить данные клиента</button>
+            </form>
+          </div>
+        </div>
+        <div class="wizard-step" data-step="schedule">
+          <button type="button" class="wizard-title" data-toggle-step="schedule">
+            <span>4. Дата и время</span>
+            <span class="wizard-status" data-summary-label="schedule">ожидает</span>
+          </button>
+          <div class="wizard-body" id="wizardScheduleBody">
+            <form id="scheduleForm" class="wizard-form inline">
+              <label>
+                Дата
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                Время
+                <input type="time" name="time" value="00:00" required />
+              </label>
+              <button type="submit" class="primary">Сохранить дату</button>
+            </form>
+          </div>
+        </div>
+        <button type="button" id="showingSubmit" class="primary full-width" disabled>Отправить показ</button>
+        <p class="modal-status" id="showingStatus"></p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="bottom-nav single" data-nav="home">
+      <a class="nav-button" href="/search.html">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">Поиск</span>
+      </a>
+    </nav>
+
+    <script type="module" src="/static/scripts/header.js"></script>
+    <script type="module" src="/static/scripts/home.js"></script>
+  </body>
+</html>

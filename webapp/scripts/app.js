@@ -3,6 +3,7 @@ const APP_LABEL = `HAPPINESS CRM · Beta ${APP_VERSION}`;
 
 const listEl = document.getElementById("objectsList");
 const searchInput = document.getElementById("searchInput");
+const priceInput = document.getElementById("priceInput");
 const modalEl = document.getElementById("detailModal");
 const modalBody = document.getElementById("detailBody");
 const modalClose = document.getElementById("modalClose");
@@ -11,15 +12,30 @@ const lightboxImg = document.getElementById("lightboxImage");
 const lightboxClose = document.getElementById("lightboxClose");
 const lightboxNavButtons = document.querySelectorAll(".lightbox-nav");
 const filterButton = document.getElementById("filterButton");
+const filterPanel = document.getElementById("filterPanel");
+const historyListEl = document.getElementById("searchHistoryList");
+const historyClearBtn = document.getElementById("clearHistoryButton");
+const sortPills = document.querySelectorAll(".sort-pill");
 
 let currentQuery = "";
 let debounceTimer;
+let priceFilterDigits = "";
 const objectCache = new Map();
 const ownerCache = new Map();
 let lightboxState = { photos: [], index: 0 };
 let modalSliderControl = null;
 let lastSuccessfulItems = [];
 let lastSuccessfulTimestamp = null;
+let sortMode = "default";
+
+window.invalidateObjectCache = (objectId) => {
+  if (!objectId) return;
+  objectCache.delete(String(objectId));
+};
+
+const HISTORY_STORAGE_KEY = "crm-search-history";
+const HISTORY_LIMIT = 8;
+let searchHistory = loadSearchHistory();
 
 const formatPrice = (value) => {
   if (value === null || value === undefined || value === "") return "—";
@@ -32,8 +48,19 @@ const shortAddress = (address) => {
   if (!address) return "—";
   const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
   if (!parts.length) return address;
-  const tail = parts.slice(-2);
-  return tail.join(", ");
+  const filtered = [];
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const part = parts[i];
+    if (/\b(АО|округ|district|р-н|район)\b/i.test(part)) {
+      continue;
+    }
+    filtered.unshift(part);
+    if (/[\d]/.test(part) && filtered.length >= 2) {
+      break;
+    }
+  }
+  const target = filtered.length ? filtered.slice(-2) : parts.slice(-2);
+  return target.join(", ");
 };
 
 const escapeInline = (value) =>
@@ -43,16 +70,56 @@ const escapeInline = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+const extractNumericId = (item) => {
+  const raw =
+    item.id ??
+    item.raw?.external_id ??
+    item.raw?.id ??
+    item.raw?.object_id ??
+    item.raw?.cian_id ??
+    "";
+  const digits = String(raw).replace(/\D/g, "");
+  return digits ? Number(digits) : Number.POSITIVE_INFINITY;
+};
+
+const extractNumericPrice = (item) => {
+  const candidates = [
+    item.price,
+    item.raw?.price,
+    item.raw?.price_total,
+    item.raw?.price_rub,
+    item.raw?.price_usd,
+  ];
+  for (const candidate of candidates) {
+    const number = Number(String(candidate ?? "").replace(/\s/g, ""));
+    if (Number.isFinite(number)) {
+      return number;
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+};
+
+const applySort = (items) => {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  if (sortMode === "id") {
+    return [...items].sort((a, b) => extractNumericId(a) - extractNumericId(b));
+  }
+  if (sortMode === "price") {
+    return [...items].sort((a, b) => extractNumericPrice(a) - extractNumericPrice(b));
+  }
+  return items;
+};
+
 const renderItems = (items, options = {}) => {
   if (!listEl) return;
   objectCache.clear();
   listEl.innerHTML = "";
 
-  let list = items;
+  let list = Array.isArray(items) ? [...items] : [];
   const numericQuery = currentQuery.replace(/\D/g, "");
   const queryIsNumeric = Boolean(currentQuery) && currentQuery.trim().replace(/[\d\s]/g, "") === "";
   if (queryIsNumeric && numericQuery) {
-    list = items.filter((item) => {
+    list = list.filter((item) => {
       const priceCandidates = [
         item.price,
         item.raw?.price,
@@ -68,6 +135,16 @@ const renderItems = (items, options = {}) => {
         .replace(/\D/g, "");
       const idMatch = idDigits && idDigits.includes(numericQuery);
       return priceMatch || idMatch;
+    });
+  }
+
+  list = applySort(list);
+
+  if (priceFilterDigits) {
+    list = list.filter((item) => {
+      const priceValue = extractNumericPrice(item);
+      if (!Number.isFinite(priceValue)) return false;
+      return String(Math.round(priceValue)).includes(priceFilterDigits);
     });
   }
 
@@ -97,35 +174,36 @@ const renderItems = (items, options = {}) => {
     if (id && item.raw) {
       objectCache.set(String(id), item.raw);
     }
+    card.dataset.objectId = id;
     const addressRaw = item.address ?? item.raw?.full_address ?? item.raw?.location ?? "—";
-    const complexName = item.raw?.complex_name || item.raw?.complex || "";
     const address = shortAddress(addressRaw);
     const price = formatPrice(item.price ?? item.raw?.price_total ?? item.raw?.price_rub);
-    const area =
-      item.raw?.area ?? item.raw?.square ?? item.raw?.square_total ?? item.raw?.living_area;
-    const rooms = item.raw?.rooms ?? item.raw?.room_count;
+    const ownerId = item.raw?.owners_id || item.raw?.owner_id || null;
+    const ownerUrl = item.raw?.owner_url || null;
+    const ownerAction = ownerUrl
+      ? `<a class="object-action" href="${escapeInline(ownerUrl)}" target="_blank" rel="noopener">Собственник</a>`
+      : ownerId
+          ? `<button type="button" class="object-action ghost" data-card-action="owner" data-owner-id="${ownerId}">Собственник</button>`
+          : `<button type="button" class="object-action ghost" disabled>Собственник</button>`;
+
+    const callAction = `<button type="button" class="object-action locked" data-card-action="call" disabled>Позвонить</button>`;
 
     card.innerHTML = `
-      <div class="object-header">
-        <div>
-          <div class="object-id">#${id}</div>
-          <div class="object-address" title="${addressRaw}">${address}</div>
-        </div>
-        <div class="object-price">${price}</div>
+      <div class="object-card-header">
+        <div class="object-id-badge">#${escapeInline(id)}</div>
+        <div class="object-address" title="${escapeInline(addressRaw)}">${escapeInline(address)}</div>
+        <div class="object-price">${escapeInline(price)}</div>
       </div>
-      <div class="object-meta">
-        <span>${rooms ? `${rooms} комн.` : "—"}</span>
-        <span>${area ? `${area} м²` : "—"}</span>
-        <span>${
-          item.raw?.floor
-            ? `Этаж ${item.raw.floor}${item.raw.floors ? `/${item.raw.floors}` : ""}`
-            : ""
-        }</span>
-        ${complexName ? `<span>${escapeInline(complexName)}</span>` : ""}
+      <div class="object-actions-row">
+        ${ownerAction}
+        ${callAction}
       </div>
     `;
 
-    card.addEventListener("click", () => openDetail(String(id)));
+    card.addEventListener("click", (event) => {
+      if (event.target.closest(".object-action")) return;
+      openDetail(String(id));
+    });
     fragment.appendChild(card);
   });
 
@@ -535,12 +613,13 @@ const buildDetailHtml = (data) => {
       </div>`
     : "";
 
+  const mainPhotoSafe = encodeURI(mainPhoto).replace(/'/g, "%27");
   const photoSection = mainPhoto
     ? `
     <div class="hero-gallery">
       <div class="hero-slider" data-photos="${encodeURIComponent(JSON.stringify(photos))}" data-current="${mainIndex}">
         <button class="hero-nav prev" aria-label="Предыдущее фото">‹</button>
-        <div class="hero-photo" data-current="${mainIndex}" style="background-image:url('${mainPhoto}')">
+        <div class="hero-photo" data-current="${mainIndex}" style="background-image:url('${mainPhotoSafe}')">
           <span class="hero-badge">Главное фото</span>
         </div>
         <button class="hero-nav next" aria-label="Следующее фото">›</button>
@@ -550,7 +629,9 @@ const buildDetailHtml = (data) => {
           ? `<div class="hero-thumbs">${photos
               .map(
                 (url, idx) => `
-                    <button class="hero-thumb ${idx === mainIndex ? "active" : ""}" data-index="${idx}" style="background-image:url('${url}')"></button>`
+                    <button class="hero-thumb ${idx === mainIndex ? "active" : ""}" data-index="${idx}" style="background-image:url('${encodeURI(
+                      url
+                    ).replace(/'/g, "%27")}')"></button>`
               )
               .join("")}</div>`
           : ""
@@ -616,7 +697,7 @@ const initModalInteractions = () => {
   const updateUI = () => {
     if (!photoEl) return;
     current = (current + photos.length) % photos.length;
-    photoEl.style.backgroundImage = `url('${photos[current]}')`;
+    if (photoEl) photoEl.style.backgroundImage = `url('${encodeURI(photos[current]).replace(/'/g, "%27")}')`;
     if (badgeEl) {
       badgeEl.textContent =
         current === 0 ? "Главное фото" : `Фото ${current + 1}/${photos.length}`;
@@ -869,7 +950,10 @@ async function fetchObjects(query = "") {
     const items = data.items ?? [];
     lastSuccessfulItems = items;
     lastSuccessfulTimestamp = new Date();
-    renderItems(items);
+    if (currentQuery) {
+      recordSearchHistory(currentQuery);
+    }
+    renderItems(lastSuccessfulItems);
   } catch (error) {
     if (lastSuccessfulItems.length) {
       const label = lastSuccessfulTimestamp
@@ -925,20 +1009,124 @@ const debouncedSearch = (event) => {
   }, 350);
 };
 
-const versionChip = document.getElementById("appVersionChip");
-if (versionChip) {
-  versionChip.textContent = APP_LABEL;
+function loadSearchHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((entry) => typeof entry === "string" && entry.trim());
+    }
+    return [];
+  } catch (error) {
+    return [];
+  }
 }
 
-filterButton?.addEventListener("click", () => {
-  const hint = document.querySelector(".filter-hint");
-  if (hint) {
-    hint.textContent = "Фильтры появятся позже";
-    hint.classList.add("highlight");
-    setTimeout(() => hint.classList.remove("highlight"), 600);
-  } else {
-    alert("Фильтры появятся позже");
+const persistSearchHistory = () => {
+  try {
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(searchHistory));
+  } catch (error) {
+    console.warn("Не удалось сохранить историю поиска", error);
   }
+};
+
+const recordSearchHistory = (query) => {
+  const normalized = String(query || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!normalized) return;
+  searchHistory = [normalized, ...searchHistory.filter((entry) => entry !== normalized)].slice(
+    0,
+    HISTORY_LIMIT
+  );
+  persistSearchHistory();
+  renderSearchHistory();
+};
+
+const clearSearchHistory = () => {
+  searchHistory = [];
+  persistSearchHistory();
+  renderSearchHistory();
+};
+
+const renderSearchHistory = () => {
+  if (!historyListEl) return;
+  if (!searchHistory.length) {
+    historyListEl.innerHTML = '<span class="history-empty">История пока пуста</span>';
+    historyClearBtn?.classList.add("hidden");
+    return;
+  }
+  historyClearBtn?.classList.remove("hidden");
+  historyListEl.innerHTML = searchHistory
+    .map((entry) => {
+      const encoded = encodeURIComponent(entry);
+      return `<button type="button" class="history-chip" data-history-value="${encoded}">${escapeInline(
+        entry
+      )}</button>`;
+    })
+    .join("");
+};
+
+renderSearchHistory();
+
+const updateSortPills = () => {
+  sortPills.forEach((pill) => {
+    const target = pill.dataset.sort || "default";
+    pill.classList.toggle("active", target === sortMode);
+  });
+};
+
+sortPills.forEach((pill) => {
+  pill.addEventListener("click", () => {
+    const mode = pill.dataset.sort || "default";
+    if (mode === sortMode) return;
+    sortMode = mode;
+    updateSortPills();
+    renderItems(lastSuccessfulItems);
+  });
+});
+
+updateSortPills();
+
+const toggleFilterPanel = (forceHide = false) => {
+  if (!filterPanel) return;
+  if (forceHide) {
+    filterPanel.classList.add("hidden");
+    return;
+  }
+  filterPanel.classList.toggle("hidden");
+};
+
+filterButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleFilterPanel();
+});
+
+filterPanel?.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
+document.addEventListener("click", (event) => {
+  if (!filterPanel || filterPanel.classList.contains("hidden")) return;
+  if (filterPanel.contains(event.target)) return;
+  if (filterButton && filterButton.contains(event.target)) return;
+  toggleFilterPanel(true);
+});
+
+historyListEl?.addEventListener("click", (event) => {
+  const chip = event.target.closest("[data-history-value]");
+  if (!chip || !searchInput) return;
+  const value = decodeURIComponent(chip.dataset.historyValue || "");
+  if (!value) return;
+  searchInput.value = value;
+  currentQuery = value;
+  toggleFilterPanel(true);
+  fetchObjects(currentQuery);
+});
+
+historyClearBtn?.addEventListener("click", (event) => {
+  event.preventDefault();
+  clearSearchHistory();
 });
 
 searchInput?.addEventListener("keydown", (event) => {
@@ -953,4 +1141,51 @@ if (searchInput && listEl) {
   fetchObjects();
 }
 
+priceInput?.addEventListener("input", (event) => {
+  priceFilterDigits = event.target.value.replace(/\D/g, "");
+  renderItems(lastSuccessfulItems);
+});
+
 window.openDetail = openDetail;
+listEl?.addEventListener("click", async (event) => {
+  const link = event.target.closest(".object-action[href]");
+  if (link) {
+    event.stopPropagation();
+    return;
+  }
+  const actionBtn = event.target.closest("[data-card-action]");
+  if (!actionBtn) return;
+  event.stopPropagation();
+  const action = actionBtn.dataset.cardAction;
+  if (action === "listing" || action === "call") {
+    return;
+  }
+  if (action === "owner") {
+    const ownerId = actionBtn.dataset.ownerId;
+    if (!ownerId) return;
+    actionBtn.disabled = true;
+    try {
+      let info = ownerCache.get(ownerId);
+      if (!info) {
+        const response = await fetch(`/api/owners/${ownerId}`);
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || response.statusText);
+        }
+        info = await response.json();
+        ownerCache.set(ownerId, info);
+      }
+      if (info.url) {
+        window.open(info.url, "_blank", "noopener");
+      } else {
+        actionBtn.textContent = "Нет ссылки";
+        setTimeout(() => (actionBtn.textContent = "Собственник"), 2000);
+      }
+    } catch (error) {
+      actionBtn.textContent = "Ошибка";
+      setTimeout(() => (actionBtn.textContent = "Собственник"), 2000);
+    } finally {
+      actionBtn.disabled = false;
+    }
+  }
+});
