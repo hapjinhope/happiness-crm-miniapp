@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>Объект · HAPPINESS CRM</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-page="object-view">
+    <header class="app-header object-view-header">
+      <button class="header-pill" data-nav="primary">Назад</button>
+      <div class="header-title">
+        <strong id="objectHeaderTitle">Объект</strong>
+        <small id="objectHeaderSubtitle">Загружаем данные...</small>
+      </div>
+      <div class="header-actions">
+        <a id="objectEditLink" class="header-action-btn ghost" href="#" hidden>Редактировать</a>
+      </div>
+    </header>
+    <main id="objectViewRoot" class="object-view">
+      <section class="object-hero" id="objectHero">
+        <div class="object-hero-track" id="objectHeroTrack"></div>
+        <div class="object-hero-counter" id="objectHeroCounter">0 / 0</div>
+      </section>
+      <section class="object-summary-card" id="objectSummary"></section>
+      <section class="object-info-card" id="objectInfo"></section>
+      <section class="object-cta-card" id="objectActions"></section>
+    </main>
+    <div id="objectLightbox" class="object-lightbox hidden" role="dialog" aria-modal="true">
+      <button type="button" class="object-lightbox-close" id="objectLightboxClose" aria-label="Закрыть">×</button>
+      <button type="button" class="object-lightbox-nav prev" id="objectLightboxPrev" aria-label="Предыдущее">‹</button>
+      <img id="objectLightboxImage" alt="Фото объекта" />
+      <button type="button" class="object-lightbox-nav next" id="objectLightboxNext" aria-label="Следующее">›</button>
+    </div>
+    <script type="module" src="/static/scripts/header.js"></script>
+    <script type="module" src="/static/scripts/object-view.js"></script>
+  </body>
+</html>

@@ -1602,7 +1602,10 @@ const renderPhotoCards = () => {
     container.querySelectorAll(".listing-card").forEach((card) => {
       card.addEventListener("click", (event) => {
         if (event.target.closest(".listing-menu-btn")) return;
-        window.openDetail?.(card.dataset.id);
+        const objectId = card.dataset.id;
+        if (objectId) {
+          window.location.href = `/object.html?id=${encodeURIComponent(objectId)}`;
+        }
       });
       const menuBtn = card.querySelector(".listing-menu-btn");
       if (menuBtn) {

@@ -512,6 +512,11 @@ def cian_report_page():
     return FileResponse(WEBAPP_DIR / "pages" / "cian-report.html")
 
 
+@app.get("/object.html")
+def object_page():
+    return FileResponse(WEBAPP_DIR / "pages" / "object.html")
+
+
 @app.get("/api/cian/order-info")
 def cian_order_info():
     try:
