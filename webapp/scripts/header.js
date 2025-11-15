@@ -43,6 +43,9 @@ const initTelegramBackButton = async () => {
   if (!tg) return;
   tg.ready();
   tg.expand();
+  if (typeof tg.disableVerticalSwipes === "function") {
+    tg.disableVerticalSwipes();
+  }
   const isHome = document.body.dataset.page === "home";
   if (isHome) {
     tg.BackButton.hide();

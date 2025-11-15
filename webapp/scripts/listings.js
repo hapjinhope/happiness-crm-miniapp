@@ -663,6 +663,11 @@ if (!container) {
   const deleteModalClose = document.getElementById("deleteModalClose");
   const deleteConfirmBtn = document.getElementById("deleteConfirmBtn");
   const deleteRelistBtn = document.getElementById("deleteRelistBtn");
+  const deleteConfirmPanel = document.getElementById("deleteConfirmPanel");
+  const deleteOptionsPanel = document.getElementById("deleteOptions");
+  const deleteConfirmText = document.getElementById("deleteConfirmText");
+  const deleteConfirmYes = document.getElementById("deleteConfirmYes");
+  const deleteConfirmNo = document.getElementById("deleteConfirmNo");
   const cardMenu = document.getElementById("cardMenu");
 
   let listingsCache = [];
@@ -689,8 +694,25 @@ if (!container) {
   const initialSearch = urlParams.get("search") || urlParams.get("q") || "";
   let pendingAutoEdit = urlParams.get("edit");
   let pendingDeleteId = null;
+  let pendingActionMode = null;
 
   const getPhoto = (obj = {}) => resolvePhoto(obj) || resolvePhoto(obj.raw || {}) || PHOTO_PLACEHOLDER;
+
+  const resolveObjectId = (item) => {
+    if (item === null || item === undefined) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item);
+    const raw = item.raw || item;
+    const value =
+      item.id ??
+      raw.external_id ??
+      raw.externalId ??
+      raw.object_id ??
+      raw.objectId ??
+      raw.id ??
+      "";
+    if (value === undefined || value === null) return "";
+    return String(value).trim();
+  };
 
   const readFileAsDataURL = (file) =>
     new Promise((resolve, reject) => {
@@ -703,7 +725,8 @@ if (!container) {
   const matchesSearch = (item) => {
     if (!searchQuery) return true;
     const obj = item.raw || {};
-    const haystack = `${item.id} ${obj.full_address || ""} ${obj.address || ""} ${
+    const identifier = resolveObjectId(item);
+    const haystack = `${identifier} ${obj.full_address || ""} ${obj.address || ""} ${
       obj.title || ""
     } ${obj.complex_name || obj.complex || ""}`
       .toLowerCase();
@@ -720,7 +743,7 @@ if (!container) {
     ) {
       return true;
     }
-    const idDigits = String(item.id ?? obj.external_id ?? "").replace(/\D/g, "");
+    const idDigits = resolveObjectId(item).replace(/\D/g, "");
     return idDigits && idDigits.includes(digitsQuery);
   };
 
@@ -1384,7 +1407,9 @@ const renderPhotoCards = () => {
         throw new Error(await response.text());
       }
       const updated = await response.json();
-      const index = listingsCache.findIndex((item) => String(item.id) === String(currentObjectId));
+      const index = listingsCache.findIndex(
+        (item) => resolveObjectId(item) === String(currentObjectId)
+      );
       if (index !== -1) {
         listingsCache[index] = {
           ...listingsCache[index],
@@ -1403,7 +1428,7 @@ const renderPhotoCards = () => {
   });
 
   const openEditor = (objectId) => {
-    const item = listingsCache.find((entry) => String(entry.id) === String(objectId));
+    const item = listingsCache.find((entry) => resolveObjectId(entry) === String(objectId));
     if (!item || !editorModal) return;
     currentObjectId = objectId;
     const data = { ...item.raw };
@@ -1426,7 +1451,7 @@ const renderPhotoCards = () => {
     if (!response.ok) {
       throw new Error(await response.text());
     }
-    listingsCache = listingsCache.filter((item) => String(item.id) !== String(objectId));
+    listingsCache = listingsCache.filter((item) => resolveObjectId(item) !== String(objectId));
     render();
   };
 
@@ -1437,14 +1462,15 @@ const renderPhotoCards = () => {
   };
 
   const toggleDeleteButtons = (disabled) => {
-    [deleteConfirmBtn, deleteRelistBtn].forEach((btn) => {
+    [deleteConfirmBtn, deleteRelistBtn, deleteConfirmYes, deleteConfirmNo].forEach((btn) => {
       if (btn) btn.disabled = disabled;
     });
   };
 
-  const closeActionConfirm = () => {
-    if (actionConfirmModal) actionConfirmModal.classList.add("hidden");
+  const resetDeleteConfirm = () => {
     pendingActionMode = null;
+    deleteConfirmPanel?.classList.add("hidden");
+    deleteOptionsPanel?.classList.remove("hidden");
   };
 
   const closeDeleteModal = () => {
@@ -1452,7 +1478,7 @@ const renderPhotoCards = () => {
     pendingDeleteId = null;
     setDeleteStatus();
     toggleDeleteButtons(false);
-    closeActionConfirm();
+    resetDeleteConfirm();
   };
 
   const openDeleteModal = (objectId) => {
@@ -1483,44 +1509,43 @@ const renderPhotoCards = () => {
     }
   };
 
-  const openActionConfirm = (mode) => {
-    if (!actionConfirmModal) {
-      performDeleteAction(mode);
-      return;
-    }
+  const openDeleteConfirm = (mode) => {
     pendingActionMode = mode;
-    actionConfirmText.textContent =
-      mode === "delete" ? "Удалить объявление навсегда?" : "Вернуть объявление в работу?";
-    actionConfirmModal.classList.remove("hidden");
+    deleteOptionsPanel?.classList.add("hidden");
+    deleteConfirmPanel?.classList.remove("hidden");
+    if (deleteConfirmText) {
+      deleteConfirmText.textContent =
+        mode === "delete"
+          ? "Вы уверены, что хотите удалить объявление навсегда?"
+          : "Вы уверены, что хотите перевыставить объявление?";
+    }
   };
 
   if (deleteConfirmBtn) {
     deleteConfirmBtn.dataset.action = "delete";
-    deleteConfirmBtn.addEventListener("click", () => openActionConfirm("delete"));
+    deleteConfirmBtn.addEventListener("click", () => openDeleteConfirm("delete"));
   }
   if (deleteRelistBtn) {
     deleteRelistBtn.dataset.action = "relist";
-    deleteRelistBtn.addEventListener("click", () => openActionConfirm("relist"));
+    deleteRelistBtn.addEventListener("click", () => openDeleteConfirm("relist"));
   }
   deleteModalClose?.addEventListener("click", closeDeleteModal);
   deleteModal?.addEventListener("click", (event) => {
     if (event.target === deleteModal) closeDeleteModal();
   });
-  actionConfirmModal?.addEventListener("click", (event) => {
-    if (event.target === actionConfirmModal) closeActionConfirm();
-  });
-  actionConfirmNo?.addEventListener("click", () => closeActionConfirm());
-  actionConfirmYes?.addEventListener("click", () => {
+  deleteConfirmNo?.addEventListener("click", () => resetDeleteConfirm());
+  deleteConfirmYes?.addEventListener("click", () => {
     if (!pendingActionMode) return;
     const mode = pendingActionMode;
-    closeActionConfirm();
+    resetDeleteConfirm();
     performDeleteAction(mode);
   });
 
   const renderCard = (item) => {
     const obj = item.raw || {};
+    const objectId = resolveObjectId(item);
     const status = item.meta?.status || "active";
-    const title = obj.title || obj.address || obj.full_address || `Объект #${item.id}`;
+    const title = obj.title || obj.address || obj.full_address || `Объект #${objectId}`;
     const address = shortAddress(obj.full_address || obj.address || obj.location || "");
     const rooms = obj.rooms ? `${obj.rooms} комн.` : "";
     const area = obj.total_area ? `${obj.total_area} м²` : "";
@@ -1536,10 +1561,10 @@ const renderPhotoCards = () => {
     const safePhoto = hasPhoto ? encodeURI(photo).replace(/'/g, "%27") : "";
     const thumbContent = hasPhoto ? "" : "<span>Фото</span>";
     const thumbStyle = hasPhoto ? `style=\"background-image:url('${safePhoto}')\"` : "";
-    const idLabel = item.id ? `<span class="listing-id">ID ${escapeHtml(item.id)}</span>` : "";
+    const idLabel = objectId ? `<span class="listing-id">ID ${escapeHtml(objectId)}</span>` : "";
 
     return `
-      <article class="listing-card status-${status}" data-id="${item.id}">
+      <article class="listing-card status-${status}" data-id="${escapeHtml(objectId)}">
         <div class="listing-card-media ${hasPhoto ? "" : "fallback"}" ${thumbStyle}>${thumbContent}</div>
         <div class="listing-card-info">
           <div class="listing-card-price">
@@ -1549,7 +1574,7 @@ const renderPhotoCards = () => {
           <p class="listing-address">${escapeHtml(address || "Адрес уточняется")}</p>
           ${summaryLine ? `<div class="listing-meta-line">${summaryLine}</div>` : ""}
         </div>
-        <button class="listing-menu-btn listing-menu-btn--right" data-id="${item.id}" aria-label="Меню">⋯</button>
+        <button class="listing-menu-btn listing-menu-btn--right" data-id="${escapeHtml(objectId)}" aria-label="Меню">⋯</button>
       </article>
     `;
   };
@@ -1609,7 +1634,8 @@ const syncCianStatuses = async () => {
     cianStatusMap = map;
     if (!Object.keys(map).length) return;
     listingsCache = listingsCache.map((item) => {
-      const override = map[String(item.id)];
+      const key = resolveObjectId(item);
+      const override = key ? map[String(key)] : null;
       if (!override) return item;
       return {
         ...item,
@@ -1660,7 +1686,9 @@ const fetchListings = async () => {
     });
     render();
     if (pendingAutoEdit) {
-      const exists = listingsCache.find((item) => String(item.id) === String(pendingAutoEdit));
+      const exists = listingsCache.find(
+        (item) => resolveObjectId(item) === String(pendingAutoEdit)
+      );
       if (exists) {
         setTimeout(() => openEditor(pendingAutoEdit), 250);
         pendingAutoEdit = null;

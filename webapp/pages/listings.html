@@ -47,24 +47,25 @@
       <button class="lightbox-nav next" aria-label="Следующее фото">›</button>
     </div>
     <div id="deleteModal" class="modal hidden">
-      <div class="modal-content confirm-modal">
+      <div class="modal-content delete-modal">
         <button id="deleteModalClose" class="modal-close" aria-label="Закрыть">×</button>
         <h3 id="deleteModalTitle">Удаление объявления</h3>
-        <div class="confirm-actions">
-          <button type="button" id="deleteRelistBtn" class="ghost">Перевыставить</button>
-          <button type="button" id="deleteConfirmBtn" class="danger">Удалить</button>
+        <div class="delete-panel" id="deleteOptions">
+          <button type="button" id="deleteRelistBtn" data-mode="relist" class="delete-option relist">
+            Перевыставить
+          </button>
+          <button type="button" id="deleteConfirmBtn" data-mode="delete" class="delete-option delete">
+            Удалить
+          </button>
+        </div>
+        <div class="delete-confirm hidden" id="deleteConfirmPanel">
+          <p id="deleteConfirmText">Вы уверены?</p>
+          <div class="confirm-actions">
+            <button type="button" id="deleteConfirmYes" class="primary">Да</button>
+            <button type="button" id="deleteConfirmNo" class="ghost">Отмена</button>
+          </div>
         </div>
         <p id="deleteModalStatus" class="modal-status"></p>
-      </div>
-    </div>
-    <div id="actionConfirmModal" class="modal hidden">
-      <div class="modal-content confirm-modal compact">
-        <button type="button" class="modal-close" data-close-modal="actionConfirmModal" aria-label="Закрыть">×</button>
-        <p id="actionConfirmText" class="modal-subtitle">Подтвердите действие</p>
-        <div class="confirm-actions">
-          <button type="button" id="actionConfirmYes" class="primary">Да</button>
-          <button type="button" id="actionConfirmNo" class="ghost">Отмена</button>
-        </div>
       </div>
     </div>
 
